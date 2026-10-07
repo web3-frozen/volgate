@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,22 @@ import (
 // version is overridable at build time:
 //
 //	go build -ldflags "-X main.version=v0.1.0" ./cmd/volgate
+//
+// When it is not set (for example `go install ...@v0.1.0`), effectiveVersion
+// falls back to the module version recorded in the build info.
 var version = "dev"
+
+// effectiveVersion reports the injected version, or the module version the
+// binary was built from.
+func effectiveVersion() string {
+	if version != "dev" && version != "" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return version
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -50,7 +66,7 @@ func main() {
 	case "config":
 		err = runConfig(args)
 	case "version", "--version", "-v":
-		fmt.Println(version)
+		fmt.Println(effectiveVersion())
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -448,7 +464,7 @@ func runServe(args []string) error {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		fmt.Fprintf(w, "volgate %s\n\nGET /healthz\nGET /config\nGET /measure?asset=btc&window=900&at=RFC3339\nGET /check?asset=btc&window=900&at=RFC3339\n",
-			version)
+			effectiveVersion())
 	})
 
 	srv := &http.Server{
@@ -457,7 +473,7 @@ func runServe(args []string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	fmt.Fprintf(os.Stderr, "volgate %s serving on http://%s (window=%s, min>%.2fbps, lookback=%s)\n",
-		version, *addr, cfg.DefaultWindow, cfg.MinExpectedMoveBps, cfg.Lookback)
+		effectiveVersion(), *addr, cfg.DefaultWindow, cfg.MinExpectedMoveBps, cfg.Lookback)
 	return srv.ListenAndServe()
 }
 
