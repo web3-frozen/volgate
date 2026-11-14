@@ -12,7 +12,8 @@ permissions:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: homelab-volgate
     strategy:
       matrix:
         go: ["1.22.x", "1.23.x", "1.24.x"]
@@ -36,7 +37,7 @@ jobs:
     name: Release binary
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: homelab-volgate
     permissions:
       contents: write
     steps:
